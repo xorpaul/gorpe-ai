@@ -1,0 +1,8 @@
+commit.sh
+config.yaml
+mcp/config.yaml
+__pycache__/
+mcp/__pycache__/
+*.pyc
+.venv/
+mcp/.venv/

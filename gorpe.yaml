@@ -1,0 +1,167 @@
+# gorpe.yaml — generic configuration for gorpe-ai
+#
+# Copy to /etc/gorpe/gorpe.yaml and adjust for your environment.
+# gorpe upstream: https://github.com/xorpaul/gorpe
+#
+# SCRIPTS_DIR below is set to /usr/local/lib/gorpe-ai/scripts — change this if
+# you install the helper scripts from this repo to a different location.
+
+main:
+  server_port: 5667
+  server_address: 0.0.0.0
+
+  # IPs allowed to connect (monitoring servers, MCP servers, etc.).
+  # Requests from any other IP are rejected before any command runs.
+  allowed_ips:
+    - 127.0.0.1
+    # - 10.0.0.5    # your monitoring server
+    # - 10.0.0.10   # your gorpe-mcp server
+
+  debug: 0
+  certs_dir: /etc/gorpe/ssl/
+
+  # Kill a running command after this many seconds. Increase for long-running
+  # commands such as puppet agent runs (which can take several minutes).
+  command_timeout: 600
+  connection_timeout: 660
+
+  # Set verify_client_cert: 1 to require mTLS (recommended for production).
+  # When enabled, gorpe validates the client cert against ca_file and rejects
+  # any connection whose cert is not signed by that CA.
+  verify_client_cert: 0
+  ca_file: /etc/gorpe/ssl/ca.pem
+
+  # Optional: restrict which client cert subjects are accepted.
+  # Requires verify_client_cert: 1.
+  # client_auth_dns:
+  #   - /CN=monitoring-agent.example.com
+  # client_auth_issuer:
+  #   - /C=XX/O=Example/CN=IssuingCA
+  # client_auth_issuer_ca_files:
+  #   - /etc/gorpe/ssl/issuing-ca.pem
+
+commands:
+  # ---------------------------------------------------------------------------
+  # Proxy command — used internally by gorpe-mcp's gorpe_run_via_proxy tool.
+  # Allows the MCP server to reach hosts that are firewalled from it directly
+  # by routing the request through a monitoring server that has access.
+  # Requires check_gorpe binary alongside check_gorpe_proxy.sh in SCRIPTS_DIR.
+  # ---------------------------------------------------------------------------
+  run_gorpe_proxy: /usr/local/lib/gorpe-ai/scripts/check_gorpe_proxy.sh $ARG$
+
+  # ---------------------------------------------------------------------------
+  # Puppet agent commands (optional — remove if you don't use Puppet)
+  # Exit codes follow puppet --detailed-exitcodes:
+  #   0 = no changes, 2 = changes applied, 4 = failures, 6 = changes + failures
+  # gorpe-mcp translates these exit codes into human-readable exit_meaning strings.
+  # ---------------------------------------------------------------------------
+  run_puppet_agent:      sudo /opt/puppetlabs/bin/puppet agent -t --logdest console
+  run_puppet_agent_noop: sudo /opt/puppetlabs/bin/puppet agent -t --logdest console --noop
+  run_puppet_agent_wild: sudo /opt/puppetlabs/bin/puppet agent $ARG$
+  run_facter_wild:       sudo /opt/puppetlabs/bin/facter $ARG$
+  run_puppet_lookup_wild: sudo /opt/puppetlabs/bin/puppet lookup $ARG$
+
+  # ---------------------------------------------------------------------------
+  # Journal / systemd log retrieval
+  # ---------------------------------------------------------------------------
+  check_journalctl_unit: sudo /usr/bin/journalctl -u $ARG$ --no-pager -n 300
+  # Template/instance units — arg format: "<template> <instance>" (@ assembled server-side)
+  check_journalctl_instance_unit: sudo /usr/bin/journalctl -u $(echo $ARG$ | sed 's/ /@/') --no-pager -n 300
+  # Last hour of a unit's journal (up to 500 lines); arg = unit name
+  run_journalctl_unit_1h: sudo /usr/bin/journalctl -u $ARG$ --since "1 hour ago" --no-pager -n 500
+  # Flexible journalctl query — pass any journalctl flags as arg, e.g. "-u nginx -n 100 --since '1 hour ago'"
+  run_journalctl_wild: sudo /usr/bin/journalctl $ARG$ --no-pager
+
+  # Puppet-specific journal queries (remove if not using Puppet)
+  check_journalctl_puppet:       sudo /usr/bin/journalctl -u puppet --no-pager -n 300
+  check_journalctl_puppet_agent: sudo /usr/bin/journalctl -t puppet-agent --no-pager -n 300
+
+  # systemctl status of a unit
+  check_systemctl_status_unit: sudo /usr/bin/systemctl status $ARG$ --no-pager
+
+  # ---------------------------------------------------------------------------
+  # Disk & filesystem
+  # ---------------------------------------------------------------------------
+  run_df:       df -h
+  run_df_wild:  df $ARG$
+  run_lsblk:    lsblk
+
+  # ---------------------------------------------------------------------------
+  # Memory, CPU, load
+  # ---------------------------------------------------------------------------
+  run_free:     free -h
+  run_uptime:   uptime
+  run_lscpu:    lscpu
+  # iostat and vmstat exit naturally with a count arg, e.g.: -a "-xd 1 3"
+  run_iostat_wild: /usr/bin/iostat $ARG$
+  run_vmstat_wild: /usr/bin/vmstat $ARG$
+  # glances one-shot snapshot: cpu, mem, memswap, load, diskio, fs, network
+  run_glances:      /usr/local/lib/gorpe-ai/scripts/run_glances.sh
+  run_glances_wild: /usr/local/lib/gorpe-ai/scripts/run_glances.sh $ARG$
+
+  # ---------------------------------------------------------------------------
+  # Processes
+  # ---------------------------------------------------------------------------
+  run_ps: ps auxf
+
+  # ---------------------------------------------------------------------------
+  # Network interfaces & routing (ip is world-readable, no sudo needed)
+  # ---------------------------------------------------------------------------
+  run_ip_addr:  ip addr show
+  run_ip_route: ip route show
+  run_ip_wild:  ip $ARG$
+
+  # ---------------------------------------------------------------------------
+  # Sockets (sudo required for /usr/sbin/ss on most distros)
+  # ---------------------------------------------------------------------------
+  run_ss_wild: sudo /usr/sbin/ss $ARG$
+
+  # ---------------------------------------------------------------------------
+  # Firewall rules (read-only views)
+  # ---------------------------------------------------------------------------
+  run_iptables_list: sudo /usr/sbin/iptables -L -n -v
+  run_nft_list:      sudo /usr/sbin/nft list ruleset
+
+  # ---------------------------------------------------------------------------
+  # Kernel ring buffer
+  # ---------------------------------------------------------------------------
+  run_dmesg: sudo /usr/bin/dmesg -T
+
+  # ---------------------------------------------------------------------------
+  # Systemd units list
+  # ---------------------------------------------------------------------------
+  run_systemctl_list: systemctl list-units --no-pager --all
+
+  # ---------------------------------------------------------------------------
+  # File reading & text processing
+  # All commands are path-restricted: file path must be absolute, no ..,
+  # /etc/shadow and /etc/gshadow are denied.
+  # run_grep_wild exits 1 (gorpe WARNING) when the pattern has no matches —
+  # that is expected for a debug command, not an alert condition.
+  # run_sed_wild blocks -i/--in-place.
+  # ---------------------------------------------------------------------------
+  run_cat_wild:  sudo /usr/local/lib/gorpe-ai/scripts/run_cat.sh  $ARG$
+  run_tail_wild: sudo /usr/local/lib/gorpe-ai/scripts/run_tail.sh $ARG$
+  run_grep_wild: sudo /usr/local/lib/gorpe-ai/scripts/run_grep.sh $ARG$
+  run_awk_wild:  sudo /usr/local/lib/gorpe-ai/scripts/run_awk.sh  $ARG$
+  run_sed_wild:  sudo /usr/local/lib/gorpe-ai/scripts/run_sed.sh  $ARG$
+
+  # ---------------------------------------------------------------------------
+  # Compressed log reading (same path restrictions)
+  # File path must be the last argument.
+  # ---------------------------------------------------------------------------
+  run_zgrep_wild:  sudo /usr/local/lib/gorpe-ai/scripts/run_zgrep.sh  $ARG$
+  run_bzgrep_wild: sudo /usr/local/lib/gorpe-ai/scripts/run_bzgrep.sh $ARG$
+  run_ztail_wild:  sudo /usr/local/lib/gorpe-ai/scripts/run_ztail.sh  $ARG$
+  run_bztail_wild: sudo /usr/local/lib/gorpe-ai/scripts/run_bztail.sh $ARG$
+
+  # ---------------------------------------------------------------------------
+  # Directory listing & file metadata (no path restrictions)
+  # ---------------------------------------------------------------------------
+  run_ls_wild:   sudo ls $ARG$
+  run_stat_wild: sudo stat $ARG$
+
+  # ---------------------------------------------------------------------------
+  # Liveness probe
+  # ---------------------------------------------------------------------------
+  check_w: w

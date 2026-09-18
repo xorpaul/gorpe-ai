@@ -1,0 +1,40 @@
+# /etc/sudoers.d/gorpe — gorpe-ai sudoers for the gorpe user
+#
+# Install to /etc/sudoers.d/gorpe (mode 0440, root:root).
+# Validate with: visudo -cf /etc/sudoers.d/gorpe
+#
+# SCRIPTS_DIR = /usr/local/lib/gorpe-ai/scripts
+# Adjust the paths if you installed scripts to a different location.
+
+Defaults:gorpe !requiretty
+
+gorpe   ALL=(ALL) NOPASSWD: \
+    /usr/bin/journalctl *, \
+    /bin/journalctl *, \
+    /usr/bin/systemctl status * --no-pager, \
+    /bin/systemctl status * --no-pager, \
+    /usr/bin/dmesg -T, \
+    /bin/dmesg -T, \
+    /usr/sbin/ss *, \
+    /usr/bin/ss *, \
+    /usr/sbin/iptables -L -n -v, \
+    /usr/sbin/nft list ruleset, \
+    /usr/bin/ls *, \
+    /bin/ls *, \
+    /usr/bin/stat *, \
+    /bin/stat *, \
+    /usr/local/lib/gorpe-ai/scripts/run_cat.sh *, \
+    /usr/local/lib/gorpe-ai/scripts/run_tail.sh *, \
+    /usr/local/lib/gorpe-ai/scripts/run_grep.sh *, \
+    /usr/local/lib/gorpe-ai/scripts/run_awk.sh *, \
+    /usr/local/lib/gorpe-ai/scripts/run_sed.sh *, \
+    /usr/local/lib/gorpe-ai/scripts/run_zgrep.sh *, \
+    /usr/local/lib/gorpe-ai/scripts/run_bzgrep.sh *, \
+    /usr/local/lib/gorpe-ai/scripts/run_ztail.sh *, \
+    /usr/local/lib/gorpe-ai/scripts/run_bztail.sh *
+
+# Puppet agent (optional — remove if not using Puppet)
+gorpe   ALL=(ALL) NOPASSWD: \
+    /opt/puppetlabs/bin/puppet agent *, \
+    /opt/puppetlabs/bin/facter *, \
+    /opt/puppetlabs/bin/puppet lookup *

@@ -1,0 +1,11 @@
+[Unit]
+Description=NRPE® clone written in golang
+After=network.target auditd.service rsyslog.service
+
+[Service]
+User=gorpe
+ExecStart=/usr/sbin/gorpe
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
