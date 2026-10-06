@@ -16,7 +16,9 @@ fi
 
 for arg in "$@"; do
   case "$arg" in
-    -i*|--in-place*) echo "ERROR: in-place editing not allowed" >&2; exit 1 ;;
+    --in-place*) echo "ERROR: in-place editing not allowed" >&2; exit 1 ;;
+    # Also catch combined short flags: -ni, -sni, etc.
+    -[!-]*) [[ "$arg" == *i* ]] && { echo "ERROR: in-place editing not allowed" >&2; exit 1; } ;;
   esac
 done
 
@@ -32,4 +34,4 @@ done
 
 [[ ! -f "$path" ]] && { echo "ERROR: not a regular file: $path" >&2; exit 1; }
 
-exec sed "$@"
+exec sed --sandbox "$@"
